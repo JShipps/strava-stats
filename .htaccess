@@ -1,0 +1,4 @@
+# Only strava.php should be reachable over the web.
+<FilesMatch "^(config|config\.example|lib|connect)\.php$">
+    Require all denied
+</FilesMatch>

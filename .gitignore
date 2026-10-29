@@ -1,0 +1,5 @@
+# Your settings and secrets
+config.php
+data/*.json
+data/*.lock
+data/.tmp*

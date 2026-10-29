@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strava Stats example</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; color: #222; }
+  .athlete { display: flex; align-items: center; gap: .75rem; }
+  .athlete img { width: 56px; height: 56px; border-radius: 50%; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; margin: 1.5rem 0; }
+  .tile { background: #f4f4f4; border-radius: 8px; padding: .75rem; text-align: center; }
+  .tile b { display: block; font-size: 1.4rem; }
+  ul { padding: 0; list-style: none; }
+  li { padding: .5rem 0; border-bottom: 1px solid #eee; }
+  .muted { color: #777; font-size: .9rem; }
+  .powered { margin-top: 2rem; font-size: .8rem; color: #fc4c02; }
+</style>
+</head>
+<body>
+  <div id="app">Loading…</div>
+  <p class="powered">Powered by Strava</p>
+
+<script>
+// Point this at wherever you uploaded strava.php.
+const ENDPOINT = 'strava.php';
+// Set to false for miles and feet.
+const METRIC = true;
+
+const km = m => METRIC ? (m / 1000).toFixed(1) + ' km' : (m / 1609.344).toFixed(1) + ' mi';
+const elev = m => METRIC ? Math.round(m) + ' m' : Math.round(m * 3.28084) + ' ft';
+const hrs = s => Math.floor(s / 3600) + 'h ' + Math.round((s % 3600) / 60) + 'm';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function load() {
+  const app = document.getElementById('app');
+  try {
+    const res = await fetch(ENDPOINT);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+
+    const a = data.athlete;
+    app.innerHTML = `
+      <div class="athlete">
+        ${a.profile ? `<img src="${esc(a.profile)}" alt="">` : ''}
+        <div>
+          <strong>${esc(a.firstname)} ${esc(a.lastname)}</strong><br>
+          <a href="${esc(a.url)}" target="_blank" rel="noopener">View on Strava</a>
+        </div>
+      </div>
+      <h2>This week</h2>
+      <div class="tiles">
+        <div class="tile"><b>${data.week.count}</b>activities</div>
+        <div class="tile"><b>${km(data.week.distance)}</b>distance</div>
+        <div class="tile"><b>${elev(data.week.elevation_gain)}</b>climbing</div>
+      </div>
+      <h2>Recent</h2>
+      <ul>${data.recent.map(r => `
+        <li>
+          <a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a><br>
+          <span class="muted">${new Date(r.start_date).toLocaleDateString()} · ${km(r.distance)} · ${elev(r.total_elevation_gain)} · ${hrs(r.moving_time)}</span>
+        </li>`).join('')}
+      </ul>
+      ${data.stale ? '<p class="muted">Showing saved data; Strava could not be reached.</p>' : ''}`;
+  } catch (e) {
+    app.textContent = 'Could not load Strava stats: ' + e.message;
+  }
+}
+
+load();
+setInterval(load, 5 * 60 * 1000);
+</script>
+</body>
+</html>
