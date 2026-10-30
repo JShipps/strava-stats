@@ -3,7 +3,8 @@
  * Strava Stats - shared library.
  *
  * Config loading, token storage and refresh, Strava API requests and the
- * summary payload. Used by strava.php (the endpoint) and connect.php (setup).
+ * summary payload. Used by strava.php (the endpoint), setup.php (the web
+ * installer) and connect.php (command-line setup).
  */
 
 if (!defined('STRAVA_STATS_VERSION')) {
@@ -29,12 +30,11 @@ class StravaException extends RuntimeException
 // ===================================================================== config
 
 /**
- * Load config.php (or the file named by STRAVA_CONFIG), apply environment
- * variable overrides and fill in defaults.
+ * Default value of every setting. config.php only needs the ones you change.
  */
-function strava_load_config(): array
+function strava_default_config(): array
 {
-    $defaults = [
+    return [
         'client_id'         => '',
         'client_secret'     => '',
         'scope'             => 'read,activity:read_all,profile:read_all',
@@ -52,6 +52,15 @@ function strava_load_config(): array
         'browser_cache_ttl' => 120,
         'debug'             => false,
     ];
+}
+
+/**
+ * Load config.php (or the file named by STRAVA_CONFIG), apply environment
+ * variable overrides and fill in defaults.
+ */
+function strava_load_config(): array
+{
+    $defaults = strava_default_config();
 
     $file = getenv('STRAVA_CONFIG') ?: __DIR__ . '/config.php';
     $cfg = [];
@@ -180,8 +189,12 @@ function strava_error_message(int $status, ?array $body): string
 /**
  * Exchange an authorization code (from the OAuth redirect) for tokens and
  * save them. Returns the token response, which includes the athlete.
+ *
+ * $grantedScope is the "scope" value Strava put on the redirect, if known.
+ * It's stored with the tokens so setup.php can tell when a reconnect is
+ * needed after the requested scopes change.
  */
-function strava_exchange_code(array $cfg, string $code): array
+function strava_exchange_code(array $cfg, string $code, ?string $grantedScope = null): array
 {
     [$status, $data] = strava_http('POST', STRAVA_OAUTH_BASE . '/token', [], [
         'client_id'     => $cfg['client_id'],
@@ -192,18 +205,24 @@ function strava_exchange_code(array $cfg, string $code): array
     if ($status < 200 || $status >= 300 || empty($data['access_token'])) {
         throw new StravaException(strava_error_message($status, $data));
     }
+    if ($grantedScope !== null) $data['scope'] = $grantedScope;
     strava_save_tokens($cfg, $data);
     return $data;
 }
 
 function strava_save_tokens(array $cfg, array $data, array $previous = []): void
 {
+    $name = isset($data['athlete'])
+        ? trim(($data['athlete']['firstname'] ?? '') . ' ' . ($data['athlete']['lastname'] ?? ''))
+        : ($previous['athlete_name'] ?? null);
     strava_write_json($cfg['token_file'], [
         'access_token'  => (string)$data['access_token'],
         // Strava may rotate the refresh token; keep the old one if it doesn't.
         'refresh_token' => (string)($data['refresh_token'] ?? ($previous['refresh_token'] ?? '')),
         'expires_at'    => isset($data['expires_at']) ? (int)$data['expires_at'] : time() + 21600,
         'athlete_id'    => $data['athlete']['id'] ?? ($previous['athlete_id'] ?? null),
+        'athlete_name'  => $name,
+        'scope'         => isset($data['scope']) ? (string)$data['scope'] : ($previous['scope'] ?? null),
         'updated_at'    => gmdate(DATE_ATOM),
     ]);
 }
@@ -219,7 +238,7 @@ function strava_access_token(array $cfg, bool $force = false): string
     }
     $tokens = strava_read_json($cfg['token_file']);
     if (empty($tokens['refresh_token'])) {
-        throw new StravaException('No Strava account connected. Run: php connect.php', 503);
+        throw new StravaException('No Strava account connected. Open setup.php in your browser, or run: php connect.php', 503);
     }
     if (!$force && !empty($tokens['access_token']) && time() < (int)($tokens['expires_at'] ?? 0) - 60) {
         return (string)$tokens['access_token'];
@@ -233,7 +252,7 @@ function strava_access_token(array $cfg, bool $force = false): string
     ]);
     if ($status < 200 || $status >= 300 || empty($data['access_token'])) {
         $hint = ($status === 400 || $status === 401)
-            ? ' The connection may have been revoked; run php connect.php again.' : '';
+            ? ' The connection may have been revoked; reconnect in setup.php or run php connect.php again.' : '';
         throw new StravaException('Could not refresh the Strava token. ' . strava_error_message($status, $data) . '.' . $hint);
     }
     strava_save_tokens($cfg, $data, $tokens);

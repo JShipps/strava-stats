@@ -8,6 +8,8 @@
  * address your browser lands on (it will fail to load - that's expected) and
  * paste it back here. The tokens are saved to the configured token_file and
  * refreshed automatically from then on.
+ *
+ * Prefer a browser? Open setup.php instead - it does all of this for you.
  */
 
 require_once __DIR__ . '/lib.php';
@@ -28,8 +30,8 @@ try {
 
 if ($cfg['client_id'] === '' || $cfg['client_secret'] === '') {
     fail("client_id and client_secret are not set.\n"
-       . "Copy config.example.php to config.php and fill them in, or set\n"
-       . "STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET.");
+       . "Copy config.example.php to config.php and fill them in, set\n"
+       . "STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET, or open setup.php in a browser.");
 }
 
 // "localhost" is always accepted by Strava as a redirect, whatever the app's
@@ -70,7 +72,7 @@ if (strpos($input, '?') !== false || strpos($input, '://') !== false) {
 if ($code === '' || !preg_match('/^[A-Za-z0-9]+$/', $code)) fail('Could not find an authorization code in that input.');
 
 try {
-    $data = strava_exchange_code($cfg, $code);
+    $data = strava_exchange_code($cfg, $code, $granted !== null ? implode(',', $granted) : null);
 } catch (StravaException $e) {
     fail($e->getMessage());
 }

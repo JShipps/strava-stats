@@ -2,7 +2,9 @@
 /**
  * Strava Stats configuration.
  *
- * Copy this file to config.php and fill in your values:
+ * Easiest: open setup.php in your browser and it writes config.php for you.
+ *
+ * Or copy this file to config.php and fill in your values:
  *
  *     cp config.example.php config.php
  *

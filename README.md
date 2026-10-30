@@ -10,7 +10,7 @@ Browser ──▶ strava.php ──▶ cache (5 min) ──▶ Strava API
                 └── tokens.json (refreshed automatically)
 ```
 
-- **No framework, no Composer.** Upload four PHP files and you're done.
+- **No framework, no Composer.** Upload the folder and open `setup.php` in your browser. No terminal or file editing needed.
 - **Safe by default.** Your client secret and tokens never reach the browser, and the rest of your profile (bikes, clubs, email) stays private unless you choose to publish it.
 - **Rate-limit friendly.** A shared cache and a lock mean Strava gets at most 3 requests per cache period, however much traffic you get.
 - **Keeps working if Strava is down.** It serves the last good response, marked `"stale": true`, instead of an error.
@@ -22,6 +22,8 @@ Browser ──▶ strava.php ──▶ cache (5 min) ──▶ Strava API
 
 - [Requirements](#requirements)
 - [Quick start](#quick-start)
+- [Setting up from a terminal](#setting-up-from-a-terminal)
+- [The web installer](#the-web-installer)
 - [Configuration](#configuration)
 - [The JSON response](#the-json-response)
 - [Using it on your site](#using-it-on-your-site)
@@ -37,72 +39,63 @@ Browser ──▶ strava.php ──▶ cache (5 min) ──▶ Strava API
 
 - PHP **7.4 or newer** with the `curl` and `json` extensions (both standard on almost every host)
 - A web server that runs PHP (Apache, nginx with PHP-FPM, LiteSpeed, Caddy, …)
-- Terminal access for one-time setup: SSH, or PHP on your own computer (see [No SSH?](#i-dont-have-ssh-access-to-my-host))
+- A folder the web server can write to (for `config.php` and `data/`)
 - A Strava account
 
 ## Quick start
 
-### 1. Create a Strava API application
+### 1. Upload
 
-1. Go to **<https://www.strava.com/settings/api>**.
-2. Fill in the form. The values are mostly cosmetic:
-   - **Application Name:** anything, e.g. "My Website"
-   - **Category:** anything sensible
-   - **Website:** your site's URL
-   - **Authorization Callback Domain:** your site's domain (e.g. `example.com`). The setup script uses `localhost`, which Strava always allows, so this value doesn't matter much.
-3. Click **Create**, then note the **Client ID** and **Client Secret**.
+Download the project and upload the `strava-stats` folder to your website, e.g. so it's at `https://example.com/strava-stats/`. Make sure the web server can write to the folder and to `data/` (on most shared hosts it already can; otherwise set both to `775` in your FTP program).
 
-### 2. Download and configure
+### 2. Run the installer
 
-```bash
-git clone https://github.com/JShipps/strava-stats.git
-cd strava-stats
-cp config.example.php config.php
-```
+Open **`https://example.com/strava-stats/setup.php`** straight away and follow the steps:
 
-Open `config.php` and paste in your Client ID and Client Secret:
+1. **Server check.** Confirms PHP, curl and folder permissions, and tells you how to fix anything missing.
+2. **Password.** Protects the installer so only you can change settings later. Do this right after uploading, because until a password is set anyone who finds the page could claim it.
+3. **Strava app.** Walks you through creating an API app at <https://www.strava.com/settings/api>, shows the exact *Authorization Callback Domain* to enter, and saves your Client ID and Secret.
+4. **Options.** Choose activity types (with Cycling, Running and Everything presets), which totals and profile fields to publish, privacy, week start, timezone, caching and CORS.
+5. **Connect.** Click **Connect with Strava**, approve access, and Strava sends you back. No copying and pasting.
+6. **Test & finish.** Shows a live preview of your feed, the endpoint URL and a copy-paste snippet, and checks that your tokens can't be downloaded.
 
-```php
-'client_id'     => '12345',
-'client_secret' => 'abcdef0123456789abcdef0123456789abcdef01',
-```
-
-Every other setting has a sensible default. See [Configuration](#configuration).
-
-### 3. Connect your Strava account (one time)
-
-```bash
-php connect.php
-```
-
-The script prints a link:
-
-1. Open the link and click **Authorize**.
-2. Your browser goes to an address starting with `http://localhost/exchange_token?...` and shows an error page. **This is expected.**
-3. Copy the whole address from the address bar and paste it into the terminal.
-
-```
-Connected as Jane Rider. Tokens saved to /var/www/strava-stats/data/tokens.json
-```
-
-From now on, the tokens refresh automatically. You won't need to run this again unless you revoke access or change accounts.
-
-### 4. Test it
-
-```bash
-php strava.php --refresh
-```
-
-You should see your stats as JSON. Then try it in a browser at `https://example.com/strava-stats/strava.php`.
-
-### 5. Upload
-
-Upload the folder to your web server if you set it up somewhere else. Make sure that:
-
-- the `data/` folder is **writable by the web server** (it stores refreshed tokens and the cache), and
-- the tokens can't be downloaded. Read [Securing your tokens](#securing-your-tokens).
+When you're happy, click **Lock installer**. You can also delete `setup.php`.
 
 To display the stats, see [Using it on your site](#using-it-on-your-site), or open `example.html` for a working demo.
+
+## Setting up from a terminal
+
+Prefer the command line, or can't make the folder writable? The original route still works.
+
+1. Create a Strava API app at <https://www.strava.com/settings/api> and note the **Client ID** and **Client Secret**. The Authorization Callback Domain doesn't matter for this route.
+2. Configure:
+
+   ```bash
+   git clone https://github.com/JShipps/strava-stats.git
+   cd strava-stats
+   cp config.example.php config.php   # then paste in client_id and client_secret
+   ```
+
+3. Connect (one time):
+
+   ```bash
+   php connect.php
+   ```
+
+   Open the printed link and click **Authorize**. Your browser goes to `http://localhost/exchange_token?...` and shows an error page, **which is expected**. Copy the whole address and paste it into the terminal.
+
+4. Test: `php strava.php --refresh`
+5. If you set it up on another machine, upload the folder **including `data/tokens.json`**, and make sure `data/` is writable on the server.
+
+## The web installer
+
+- **Coming back later.** Open `setup.php` again and log in with your installer password to change options, reconnect, or switch accounts. Everything is saved to `config.php`, which you can still edit by hand.
+- **Existing installs.** If `config.php` already has a Client Secret when you first open `setup.php`, you'll be asked for that secret before you can set a password. That way nobody else can take over an install you set up by hand.
+- **Forgot the password?** Delete the `setup_password_hash` line from `config.php` and open `setup.php`. You'll be asked for your Client Secret, then for a new password.
+- **Locking.** **Lock installer** sets `'setup_locked' => true` in `config.php`, and `setup.php` then returns 404. Set it back to `false` to unlock. Deleting `setup.php` works too.
+- **Changing permissions.** If you tick "Include Only You activities" or "Allow access to FTP and weight" after connecting, the installer asks you to reconnect so Strava can show you the new permissions.
+- **Environment variables** still win over `config.php`. The installer points out any setting that is overridden this way.
+- **Callback domain.** The installer redirects back to itself, so your Strava app's *Authorization Callback Domain* must match your site's domain (e.g. `example.com`). If it doesn't, Strava shows `redirect_uri invalid`. `localhost` is always allowed.
 
 ---
 
@@ -358,6 +351,7 @@ curl -I https://example.com/strava-stats/data/tokens.json
 
 Also:
 
+- `setup.php` checks this for you on its last step.
 - Never commit `config.php` or `data/*.json`. The included `.gitignore` already excludes them.
 - Token files are created with `0600` permissions, readable only by their owner. If you run `connect.php` as yourself but PHP runs as `www-data`, transfer ownership:
   ```bash
@@ -393,9 +387,11 @@ Run `php strava.php --refresh` from the terminal. It always prints the full erro
 
 | Message | Cause and fix |
 |---|---|
-| `client_id and client_secret are not configured` | `config.php` is missing or empty. Run `cp config.example.php config.php` and fill it in. |
-| `No Strava account connected. Run: php connect.php` | No tokens yet, or `token_file` points to the wrong place. |
-| `Could not refresh the Strava token … run php connect.php again` | Access was revoked, the client secret changed, or the tokens belong to a different app. Run `php connect.php` again. |
+| `client_id and client_secret are not configured` | `config.php` is missing or empty. Open `setup.php`, or run `cp config.example.php config.php` and fill it in. |
+| Strava shows `redirect_uri invalid` after clicking Connect | Your Strava app's Authorization Callback Domain doesn't match your site's domain. Edit it at strava.com/settings/api to the domain `setup.php` shows. |
+| `setup.php` returns 404 | The installer is locked. Set `'setup_locked' => false` in `config.php`. |
+| `No Strava account connected…` | No tokens yet, or `token_file` points to the wrong place. Connect in `setup.php` or run `php connect.php`. |
+| `Could not refresh the Strava token…` | Access was revoked, the client secret changed, or the tokens belong to a different app. Reconnect in `setup.php` or run `php connect.php` again. |
 | `Cannot write file: …/data/tokens.json` | The web server can't write to `data/`. Fix the ownership or permissions (`chown www-data data` or `chmod 775 data`). |
 | `Strava rate limit reached` | Too many requests. Raise `cache_ttl`, and check whether other scripts use the same app. |
 | `The PHP curl extension is required` | Install or enable it (`sudo apt install php-curl`, or enable it in your host's control panel). |
@@ -413,11 +409,7 @@ Run `php strava.php --refresh` from the terminal. It always prints the full erro
 
 ### I don't have SSH access to my host
 
-Run the setup on your own computer, which needs PHP installed:
-
-1. Download the project, create `config.php`, and run `php connect.php` locally.
-2. Upload the whole folder, **including `data/tokens.json`**, to your host.
-3. Make sure `data/` is writable on the host, because tokens are rewritten every ~6 hours when they refresh.
+You don't need it. Upload the folder and open `setup.php` in your browser. See [Quick start](#quick-start).
 
 ### Can it show more than one athlete?
 
@@ -442,9 +434,10 @@ Replace every file except `config.php` and `data/`. If a new version adds option
 | File | Purpose |
 |---|---|
 | `strava.php` | The public JSON endpoint. Also works from the command line (`--refresh` skips the cache). |
-| `connect.php` | One-time OAuth setup. Command line only, and returns 404 over the web. |
+| `setup.php` | Web installer: configuration, Strava connection and a feed test in the browser. Lock or delete it when you're done. |
+| `connect.php` | One-time OAuth setup from the command line. Returns 404 over the web. |
 | `lib.php` | Config, tokens, HTTP, caching and payload logic. |
-| `config.example.php` | Documented config template. Copy it to `config.php`. |
+| `config.example.php` | Documented config template. `setup.php` writes `config.php` for you, or copy this by hand. |
 | `example.html` | Demo widget. |
 | `data/` | Tokens and cache. Must be writable and private. |
 | `.htaccess`, `data/.htaccess` | Apache rules that block everything except `strava.php`. |
