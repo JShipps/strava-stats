@@ -76,6 +76,7 @@ All settings are in `config.php`. Each one can also be set with an environment v
 | `activity_types` | `STRAVA_ACTIVITY_TYPES` | All cycling types | Which [sport types](https://developers.strava.com/docs/reference/#api-models-SportType) count. `['*']` means all. |
 | `fetch_count` | `STRAVA_FETCH_COUNT` | `30` | Recent activities fetched (1–200). They feed the weekly totals and the `recent` list. |
 | `recent_count` | `STRAVA_RECENT_COUNT` | `6` | Matching activities returned in `recent`. |
+| `display_units` | `STRAVA_DISPLAY_UNITS` | `metric` | `metric` (km, m) or `imperial` (mi, ft). Only tells pages how to *display* values; the numbers in the feed are always metric. Returned as `display_units`. |
 | `week_starts_on` | `STRAVA_WEEK_STARTS_ON` | `monday` | `monday` or `sunday`. |
 | `timezone` | `STRAVA_TIMEZONE` | *auto* | Sets when "this week" starts, e.g. `Europe/London`. If empty, uses your latest activity's timezone, then UTC. |
 | `athlete_fields` | `STRAVA_ATHLETE_FIELDS` | `id, firstname, lastname, city, state, country, profile, url` | Profile fields to publish. See [The JSON response](#athlete). |
@@ -189,6 +190,7 @@ If you don't want private activities included, use `read,activity:read` and run 
     }
   ],
   "units": { "distance": "meters", "elevation": "meters", "time": "seconds", "speed": "meters/second", "weight": "kilograms" },
+  "display_units": "imperial",
   "generated_at": "2026-10-29T13:10:02+00:00"
 }
 ```
@@ -200,6 +202,8 @@ If you don't want private activities included, use `read,activity:read` and run 
 | `week` | Totals for matching activities in the current calendar week (from `week_starts_on`, midnight, in your timezone). |
 | `seven` | Totals for matching activities in the last 7 × 24 hours. |
 | `recent` | The latest `recent_count` matching activities, newest first. |
+| `units` | The units of every number in the response. Always metric. |
+| `display_units` | `metric` or `imperial`: how the site owner wants values shown (the `display_units` setting). Convert with the formulas below. |
 | `stale` | Only present (as `true`) when Strava couldn't be reached and the last good response is being served. |
 | `error` | Only present on failure, with a non-200 HTTP status. |
 
@@ -222,7 +226,7 @@ fetch('/strava-stats/strava.php')
   .then(r => r.json())
   .then(data => {
     if (data.error) throw new Error(data.error);
-    const km = (data.week.distance / 1000).toFixed(1);
+    const km = (data.week.distance / 1000).toFixed(1); // or check data.display_units
     document.getElementById('strava').textContent =
       `${data.athlete.firstname} has ridden ${km} km in ${data.week.count} rides this week.`;
   })
@@ -230,7 +234,7 @@ fetch('/strava-stats/strava.php')
 </script>
 ```
 
-`example.html` has a fuller widget with a profile, weekly tiles, a recent activity list, a metric/imperial switch and auto-refresh.
+`example.html` has a fuller widget with a profile, weekly tiles, a recent activity list and auto-refresh. It shows kilometres or miles according to `display_units`.
 
 ### Converting units
 

@@ -11,6 +11,11 @@ What your visitors can see (you choose which parts):
 - Your most recent activities
 - Your totals for the last 4 weeks, this year and all time
 
+<p align="center">
+  <img src="docs/images/example-card.png" width="600" alt="A stats card showing a profile picture, this week's totals of 3 activities, 135 km and 1,530 m of climbing, and a list of four recent rides.">
+  <br><em>The ready-made card included in the download, shown here with sample data.</em>
+</p>
+
 Your private details stay private. Anything you don't choose to show never leaves your server, and you can't post, edit or delete anything on Strava through this tool. It can only read.
 
 > Strava Stats is a free, independent project. It isn't made or endorsed by Strava.
@@ -74,11 +79,21 @@ Go to `https://your-website.com/strava-stats/setup.php` in your browser. The ins
    - Click **Create**. Strava may ask for an icon first; any picture will do.
    - Copy the **Client ID** and **Client Secret** (click "Show" to reveal it) back into the installer.
 
-4. **Options.** Choose what counts and what's shown. Not sure? Click **Cycling**, **Running** or **Everything** and leave the rest as it is. You can change all of this later.
+4. **Options.** First, pick your **units**: kilometres and metres, or miles and feet. Then choose what counts and what's shown. Not sure? Click **Cycling**, **Running** or **Everything** and leave the rest as it is. You can change all of this later.
 
 5. **Connect.** Click **Connect with Strava**. Strava asks whether you want to allow access. Click **Authorize** and you'll come straight back to the installer.
 
 6. **Test & finish.** You'll see a preview of your stats, a link to your feed, and a ready-made block of code to put on your website. The installer also checks that your private connection details can't be downloaded by anyone else.
+
+<p align="center">
+  <img src="docs/images/installer-options.png" width="700" alt="The installer's Options screen, with a step list on the left and a choice between kilometres and miles at the top.">
+  <br><em>The Options screen. The steps down the left show how far along you are.</em>
+</p>
+
+<p align="center">
+  <img src="docs/images/installer-finish.png" width="700" alt="The installer's last screen, headed &quot;You're all set&quot;, previewing this week's totals and recent activities.">
+  <br><em>The last screen previews your stats so you know it's working before you add it to your site.</em>
+</p>
 
 ### 4. Lock the installer
 
@@ -103,16 +118,18 @@ It looks like this (with your address instead of `your-website.com`):
 fetch('https://your-website.com/strava-stats/strava.php')
   .then(r => r.json())
   .then(data => {
-    const km = (data.week.distance / 1000).toFixed(1);
+    const miles = data.display_units === 'imperial';
+    const d = miles ? (data.week.distance / 1609.344).toFixed(1) + ' mi'
+                    : (data.week.distance / 1000).toFixed(1) + ' km';
     document.getElementById('strava').textContent =
-      `${data.week.count} activities, ${km} km this week`;
+      `${data.week.count} activities, ${d} this week`;
   });
 </script>
 ```
 
-That shows a single line, like *"3 activities, 135.0 km this week"*.
+That shows a single line, like *"3 activities, 83.9 mi this week"*, in the units you chose in the installer.
 
-**Want something nicer?** The download includes `example.html`, a ready-made card with your photo, this week's totals in boxes, and your recent activities. Open `https://your-website.com/strava-stats/example.html` to see it working. To use it on your own page, copy its contents, then near the top change `const ENDPOINT = 'strava.php';` to your full feed address, e.g. `const ENDPOINT = 'https://your-website.com/strava-stats/strava.php';`. To show miles and feet instead of kilometres and metres, change `const METRIC = true;` to `const METRIC = false;` near the top.
+**Want something nicer?** The download includes `example.html`, a ready-made card with your photo, this week's totals in boxes, and your recent activities. Open `https://your-website.com/strava-stats/example.html` to see it working. To use it on your own page, copy its contents, then near the top change `const ENDPOINT = 'strava.php';` to your full feed address, e.g. `const ENDPOINT = 'https://your-website.com/strava-stats/strava.php';`. It uses the units you chose in the installer.
 
 **Using Squarespace, Wix or a site on a different domain?** If your stats are displayed on a different domain from the one Strava Stats is installed on, open the installer, go to **Options → Other websites**, and add your site's address (for example `https://my-portfolio.com`). Otherwise the browser will refuse to load the stats.
 
@@ -154,6 +171,9 @@ Open the installer and go to **Test & finish** to see the full reason. Most ofte
 
 **The installer's security check says "Your tokens are public!"**
 Your web server is letting people download the file that holds your Strava connection. Copy the rule the installer shows and send it to your host's support team, asking them to add it to your site's server configuration. Or, in the installer, go to **Options → Advanced** and move the token file to a folder outside `public_html`.
+
+**I want to switch between miles and kilometres.**
+Open the installer, go to **Options**, and change **Units**. Pages using the installer's code or `example.html` switch over by themselves within a couple of minutes. There's nothing to edit on your page.
 
 **I changed a setting and my page didn't change.**
 Your stats are saved for a few minutes so Strava isn't asked too often. Wait 5 minutes, or click **Fetch fresh data** on the installer's last screen.

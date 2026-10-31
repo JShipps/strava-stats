@@ -24,8 +24,8 @@
 <script>
 // Point this at wherever you uploaded strava.php.
 const ENDPOINT = 'strava.php';
-// Set to false for miles and feet.
-const METRIC = true;
+// Kilometres or miles follow the "Units" choice in setup.php.
+let METRIC = true;
 
 const km = m => METRIC ? (m / 1000).toFixed(1) + ' km' : (m / 1609.344).toFixed(1) + ' mi';
 const elev = m => METRIC ? Math.round(m) + ' m' : Math.round(m * 3.28084) + ' ft';
@@ -38,6 +38,7 @@ async function load() {
     const res = await fetch(ENDPOINT);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || res.statusText);
+    METRIC = data.display_units !== 'imperial';
 
     const a = data.athlete;
     app.innerHTML = `

@@ -273,7 +273,12 @@ function setup_write_config(string $file, array $raw): void
 {
     $defaults = strava_default_config();
     $ordered = [];
-    foreach (array_keys($defaults) as $k) $ordered[$k] = array_key_exists($k, $raw) ? $raw[$k] : $defaults[$k];
+    foreach (array_keys($defaults) as $k) {
+        // display_units is only written once chosen, so the Options step can
+        // tell a first visit (and suggest units from the browser's locale).
+        if ($k === 'display_units' && !array_key_exists($k, $raw)) continue;
+        $ordered[$k] = array_key_exists($k, $raw) ? $raw[$k] : $defaults[$k];
+    }
     foreach ($raw as $k => $v) if (!array_key_exists($k, $ordered) && strpos((string)$k, 'setup_') !== 0) $ordered[$k] = $v;
     foreach (['setup_password_hash', 'setup_locked'] as $k) if (array_key_exists($k, $raw)) $ordered[$k] = $raw[$k];
 
@@ -284,6 +289,7 @@ function setup_write_config(string $file, array $raw): void
         'cache_ttl'           => 'Seconds to reuse a response before asking Strava again',
         'activity_types'      => "Activity types that count (['*'] means all)",
         'fetch_count'         => 'Activities fetched from Strava / returned in "recent"',
+        'display_units'       => "How distances are shown on your site: 'metric' (km) or 'imperial' (miles)",
         'week_starts_on'      => 'Weekly totals',
         'athlete_fields'      => 'What gets published',
         'allowed_origins'     => 'Other sites allowed to call strava.php from a browser (CORS)',
@@ -461,6 +467,7 @@ function setup_parse_options(array $p, string $configDir): array
         $e[] = 'Publishing FTP or weight needs "Allow access to FTP and weight" under Privacy.';
     }
 
+    $v['display_units']  = ($p['display_units'] ?? '') === 'imperial' ? 'imperial' : 'metric';
     $v['week_starts_on'] = ($p['week_starts_on'] ?? '') === 'sunday' ? 'sunday' : 'monday';
     $tz = trim((string)($p['timezone'] ?? ''));
     if ($tz !== '' && !in_array($tz, DateTimeZone::listIdentifiers(), true)) {
@@ -983,9 +990,24 @@ function render_options(array $c): string
     $presets = [];
     foreach (SETUP_PRESETS as $k => $p) $presets[$k] = ['types' => $p['types'], 'stats' => $p['stats']];
 
+    $imperial = $v['display_units'] === 'imperial';
+    $unitsChosen = isset($c['raw']['display_units']) || $o !== null;
+    $unitCard = function ($value, $title, $example, $checked) {
+        return '<label class="unit"><input type="radio" name="display_units" value="' . $value . '"' . ($checked ? ' checked' : '') . '>'
+             . '<span><strong>' . $title . '</strong><small>' . $example . '</small></span></label>';
+    };
+
     return '<h1>Choose what to show</h1><p class="lede">The defaults suit a cyclist. Change anything you like; you can come back later.</p>'
         . '<form method="post" class="stack" id="options">' . csrf_field($c['csrf'], 'save_options')
         . '<script type="application/json" id="presets">' . json_encode($presets, JSON_HEX_TAG | JSON_HEX_AMP) . '</script>'
+
+        . '<fieldset><legend>Units</legend>'
+        . '<p class="hint">How distances and climbing are shown on your website.</p>'
+        . '<div class="units"' . ($unitsChosen ? '' : ' data-guess-units') . '>'
+        . $unitCard('metric', 'Kilometres and metres', 'e.g. 42.5 km · 610 m climbing', !$imperial)
+        . $unitCard('imperial', 'Miles and feet', 'e.g. 26.4 mi · 2,001 ft climbing', $imperial)
+        . '</div><p class="hint">You can switch later. Pages using the code from this installer or <code>example.html</code> follow this setting automatically.</p>'
+        . setup_env_note('display_units') . '</fieldset>'
 
         . '<fieldset><legend>Activities that count</legend>'
         . '<p class="hint">These feed your weekly totals and your recent activity list.</p>'
@@ -1097,12 +1119,14 @@ function render_finish(array $c): string
     if ($payload) {
         $a = $payload['athlete'] ?? [];
         $w = $payload['week'] ?? [];
-        $km = function ($m) { return number_format($m / 1000, 1) . ' km <span>' . number_format($m / 1609.344, 1) . ' mi</span>'; };
+        $mi = $cfg['display_units'] === 'imperial';
+        $dist = function ($m) use ($mi) { return $mi ? number_format($m / 1609.344, 1) . ' mi' : number_format($m / 1000, 1) . ' km'; };
+        $elev = function ($m) use ($mi) { return $mi ? number_format($m * 3.28084) . ' ft' : number_format($m) . ' m'; };
         $name = trim(($a['firstname'] ?? '') . ' ' . ($a['lastname'] ?? ''));
         $recent = '';
         foreach (array_slice($payload['recent'] ?? [], 0, 3) as $r) {
             $date = !empty($r['start_date']) ? date('M j', strtotime((string)$r['start_date'])) : '';
-            $recent .= '<li><span>' . h($r['name']) . '</span><span class="detail">' . h($date) . ' · ' . number_format($r['distance'] / 1000, 1) . ' km</span></li>';
+            $recent .= '<li><span>' . h($r['name']) . '</span><span class="detail">' . h($date) . ' · ' . $dist((float)$r['distance']) . '</span></li>';
         }
         $out .= '<div class="preview">'
               . '<div class="who">' . (!empty($a['profile']) && strpos((string)$a['profile'], 'https://') === 0 ? '<img src="' . h($a['profile']) . '" alt="">' : '')
@@ -1110,8 +1134,8 @@ function render_finish(array $c): string
               . h(date('M j, g:i a', strtotime((string)$payload['generated_at']))) . ' (server time)'
               . (!empty($payload['stale']) ? ' · <b>saved copy</b>, Strava was unreachable' : '') . '</span></div></div>'
               . '<div class="tiles"><div><b>' . (int)($w['count'] ?? 0) . '</b>activities this week</div>'
-              . '<div><b>' . $km((float)($w['distance'] ?? 0)) . '</b>distance</div>'
-              . '<div><b>' . number_format((float)($w['elevation_gain'] ?? 0)) . ' m</b>climbing</div></div>'
+              . '<div><b>' . $dist((float)($w['distance'] ?? 0)) . '</b>distance</div>'
+              . '<div><b>' . $elev((float)($w['elevation_gain'] ?? 0)) . '</b>climbing</div></div>'
               . ($recent !== '' ? '<ul class="recent">' . $recent . '</ul>' : '<p class="hint">No matching activities in your latest ' . (int)$cfg['fetch_count'] . '. Check "Activities that count" in Options.</p>')
               . '<form method="post">' . csrf_field($c['csrf'], 'refresh') . '<button class="btn small ghost">Fetch fresh data</button></form>'
               . '</div>';
@@ -1122,8 +1146,11 @@ function render_finish(array $c): string
     }
 
     $snippet = "<div id=\"strava\"></div>\n<script>\nfetch('" . $endpoint . "')\n  .then(r => r.json())\n  .then(data => {\n"
-             . "    const km = (data.week.distance / 1000).toFixed(1);\n    document.getElementById('strava').textContent =\n"
-             . "      `\${data.week.count} activities, \${km} km this week`;\n  });\n</script>";
+             . "    const miles = data.display_units === 'imperial';\n"
+             . "    const d = miles ? (data.week.distance / 1609.344).toFixed(1) + ' mi'\n"
+             . "                    : (data.week.distance / 1000).toFixed(1) + ' km';\n"
+             . "    document.getElementById('strava').textContent =\n"
+             . "      `\${data.week.count} activities, \${d} this week`;\n  });\n</script>";
 
     $out .= '<h2>Your feed</h2><p>Your stats are published as JSON here:</p><p>' . copy_field($endpoint) . ' <a class="btn small ghost" href="' . h($endpoint) . '" target="_blank" rel="noopener">Open</a></p>'
           . '<p>Paste this into any page on your site to show this week\'s totals. <code>example.html</code> has a fuller widget.</p>'
@@ -1238,6 +1265,12 @@ fieldset>legend+*{clear:both}
 .group{background:var(--soft);border-radius:var(--radius);padding:12px 14px}
 .group-head{display:flex;justify-content:space-between;align-items:baseline;font-weight:600;font-size:.9rem;margin-bottom:6px}
 .group-head .linkish{font-size:.8rem;font-weight:400}
+.units{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.unit{display:flex;gap:10px;align-items:flex-start;padding:14px 16px;border:1.5px solid var(--line);border-radius:var(--radius);cursor:pointer}
+.unit:has(input:checked){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,var(--surface))}
+.unit input{margin:.3em 0 0;accent-color:var(--accent);width:16px;height:16px;flex:none}
+.unit span{display:flex;flex-direction:column}
+@media (max-width:520px){.units{grid-template-columns:1fr}}
 .chips{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.9rem;color:var(--muted)}
 .chip{font:inherit;font-size:.88rem;padding:5px 12px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
 .chip:hover{border-color:var(--accent)}
@@ -1345,6 +1378,15 @@ if (form) {
       boxes.forEach(function (c) { c.checked = any; });
     });
   });
+  var guess = form.querySelector('[data-guess-units]');
+  if (guess) {
+    try {
+      var loc = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+      if (/-(US|LR|MM)$/i.test(loc)) {
+        var imp = guess.querySelector('input[value="imperial"]'); if (imp) imp.checked = true;
+      }
+    } catch (e) {}
+  }
   var tz = document.getElementById('timezone'), hint = document.getElementById('tz_hint'), use = document.getElementById('tz_use');
   try {
     var mine = Intl.DateTimeFormat().resolvedOptions().timeZone;

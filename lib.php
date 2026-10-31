@@ -44,6 +44,7 @@ function strava_default_config(): array
         'activity_types'    => ['Ride', 'VirtualRide', 'MountainBikeRide', 'GravelRide', 'EBikeRide', 'EMountainBikeRide'],
         'fetch_count'       => 30,
         'recent_count'      => 6,
+        'display_units'     => 'metric',
         'week_starts_on'    => 'monday',
         'timezone'          => '',
         'athlete_fields'    => ['id', 'firstname', 'lastname', 'city', 'state', 'country', 'profile', 'url'],
@@ -90,6 +91,7 @@ function strava_load_config(): array
     foreach ($ints as $key) $cfg[$key] = max(0, (int)$cfg[$key]);
     $cfg['fetch_count']    = min(200, max(1, $cfg['fetch_count']));
     $cfg['week_starts_on'] = strtolower((string)$cfg['week_starts_on']) === 'sunday' ? 'sunday' : 'monday';
+    $cfg['display_units']  = strtolower((string)$cfg['display_units']) === 'imperial' ? 'imperial' : 'metric';
     foreach ($lists as $key) $cfg[$key] = array_values((array)$cfg[$key]);
     $cfg['client_id']     = trim((string)$cfg['client_id']);
     $cfg['client_secret'] = trim((string)$cfg['client_secret']);
@@ -337,6 +339,8 @@ function strava_build_payload(array $cfg): array
         'seven'        => $seven,
         'recent'       => $recent,
         'units'        => ['distance' => 'meters', 'elevation' => 'meters', 'time' => 'seconds', 'speed' => 'meters/second', 'weight' => 'kilograms'],
+        // How the site owner wants numbers shown. Values above stay metric.
+        'display_units' => $cfg['display_units'],
         'generated_at' => gmdate(DATE_ATOM),
     ];
 }

@@ -70,6 +70,13 @@ return [
     // How many matching activities to return in "recent".
     'recent_count' => 6,   // env: STRAVA_RECENT_COUNT
 
+    // ----------------------------------------------------------------- Units
+    // How distances and climbing are shown on your site: 'metric' (km and m)
+    // or 'imperial' (miles and feet). The numbers in the feed are always
+    // metric; this tells example.html and the setup.php snippet which units
+    // to display, so you can switch later without changing your page.
+    'display_units' => 'metric',   // env: STRAVA_DISPLAY_UNITS
+
     // ----------------------------------------------------------------- Weeks
     // First day of the week for the "week" totals: 'monday' or 'sunday'.
     'week_starts_on' => 'monday',   // env: STRAVA_WEEK_STARTS_ON
